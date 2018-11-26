@@ -252,6 +252,27 @@ The thumbnailPath is the direct URI for the temp location of the contact's cropp
 <Image source={{uri: contact.thumbnailPath}} />
 ```
 
+## Subscribe to Change Events
+
+Subscribes to `ContactsChanged` event that's fired when changes to contacts are detected.
+
+```es
+const eventEmitter = new NativeEventEmitter(NativeModules.Contacts);
+let subscription;
+
+Contacts.subscribeToUpdates((err, authResult) => {
+  if (err) throw err;
+  // failed
+
+  if (authResult === Contacts.PERMISSION_AUTHORIZED) {
+    subscription = eventEmitter.addListener('ContactsChanged', () => console.log("Changes detected!"));
+  }
+});
+
+// later on
+subscription && subscription.remove();
+```
+
 ## Permissions Methods (optional)
 `checkPermission` (callback) - checks permission to access Contacts.  
 `requestPermission` (callback) - request permission to access Contacts.  

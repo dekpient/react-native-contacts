@@ -9,6 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.ContentUris;
+import android.database.ContentObserver;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.Manifest;
@@ -23,6 +24,7 @@ import android.provider.ContactsContract.CommonDataKinds.Website;
 import android.provider.ContactsContract.RawContacts;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
+import android.util.Log;
 
 import com.facebook.react.bridge.Callback;
 import com.facebook.react.bridge.ReactApplicationContext;
@@ -33,6 +35,7 @@ import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.bridge.Arguments;
+import com.facebook.react.modules.core.DeviceEventManagerModule;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -43,6 +46,8 @@ import java.util.Hashtable;
 
 public class ContactsManager extends ReactContextBaseJavaModule {
 
+    private static final String LOG_TAG = "ContactsManager";
+    private static final String CONTACTS_CHANGED_EVENT = "ContactsChanged";
     private static final String PERMISSION_DENIED = "denied";
     private static final String PERMISSION_AUTHORIZED = "authorized";
     private static final String PERMISSION_READ_CONTACTS = Manifest.permission.READ_CONTACTS;
@@ -50,8 +55,49 @@ public class ContactsManager extends ReactContextBaseJavaModule {
 
     private static Callback requestCallback;
 
+    private final ContactsObserver contactsObserver = new ContactsObserver();
+
     public ContactsManager(ReactApplicationContext reactContext) {
         super(reactContext);
+    }
+
+    private class ContactsObserver extends ContentObserver {
+        public ContactsObserver() {
+            super(null);
+        }
+
+        @Override
+        public void onChange(boolean selfChange) {
+            super.onChange(selfChange);
+            getReactApplicationContext()
+                .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
+                .emit(CONTACTS_CHANGED_EVENT, null);
+            Log.d(LOG_TAG, "[ContactsObserver] Detected contact updates and fired event");
+        }
+    }
+
+    /**
+     * Registers a content observer which fires ContactsChanged event when contacts changes are detected
+     *
+     * @param callback for registration result
+     */
+    @ReactMethod
+    public void subscribeToUpdates(final Callback callback) {
+        if (!isPermissionGranted().equals(PERMISSION_AUTHORIZED)) {
+            callback.invoke(null, PERMISSION_DENIED);
+            return;
+        }
+        Log.d(LOG_TAG, "[subscribeToUpdates] Subscribe to contact updates");
+        try {
+            getReactApplicationContext()
+                .getApplicationContext()
+                .getContentResolver()
+                .registerContentObserver(ContactsContract.Contacts.CONTENT_URI, true, contactsObserver);
+            callback.invoke(null, PERMISSION_AUTHORIZED);
+        } catch (Exception e) {
+            Log.e(LOG_TAG, "[subscribeToUpdates] Error when subscribing to contact updates", e);
+            callback.invoke(e.toString());
+        }
     }
 
     /*
