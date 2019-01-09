@@ -120,21 +120,25 @@ public class ContactsProvider {
         String[] selectionArgs = new String[]{contactRawId};
         Cursor rawCursor = contentResolver.query(ContactsContract.RawContacts.CONTENT_URI, projections, select, selectionArgs, null);
         String contactId = null;
-        if (rawCursor.getCount() == 0) {
-            /*contact id not found */
-        }
+        try {
+            if (rawCursor.getCount() == 0) {
+                /*contact id not found */
+            }
 
-        if (rawCursor.moveToNext()) {
-            int columnIndex;
-            columnIndex = rawCursor.getColumnIndex(ContactsContract.RawContacts.CONTACT_ID);
-            if (columnIndex == -1) {
-                /* trouble getting contact id */
-            } else {
-                contactId = rawCursor.getString(columnIndex);
+            if (rawCursor.moveToNext()) {
+                int columnIndex;
+                columnIndex = rawCursor.getColumnIndex(ContactsContract.RawContacts.CONTACT_ID);
+                if (columnIndex == -1) {
+                    /* trouble getting contact id */
+                } else {
+                    contactId = rawCursor.getString(columnIndex);
+                }
+            }
+        } finally {
+            if (rawCursor != null) {
+                rawCursor.close();
             }
         }
-
-        rawCursor.close();
 
         //Now that we have the real contact id, fetch information
         return getContactById(contactId);
@@ -160,11 +164,11 @@ public class ContactsProvider {
                 }
             }
         }
-        
+
         if(matchingContacts.values().size() > 0) {
             return matchingContacts.values().iterator().next().toMap();
         }
-        
+
        return null;
     }
 
