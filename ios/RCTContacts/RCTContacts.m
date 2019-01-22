@@ -11,6 +11,10 @@ NSString *const RCTContactsChanged = @"ContactsChanged";
 
 RCT_EXPORT_MODULE();
 
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
 - (NSDictionary *)constantsToExport
 {
     return @{
@@ -32,6 +36,7 @@ RCT_EXPORT_MODULE();
 
 RCT_EXPORT_METHOD(subscribeToUpdates:(RCTResponseSenderBlock) callback)
 {
+    NSLog(@"RCTContacts: [subscribeToUpdates]");
     CNContactStore* contactStore = [self contactsStore:callback];
     CNAuthorizationStatus authStatus = [CNContactStore authorizationStatusForEntityType:CNEntityTypeContacts];
     if (!contactStore || authStatus != CNAuthorizationStatusAuthorized) {
@@ -42,6 +47,12 @@ RCT_EXPORT_METHOD(subscribeToUpdates:(RCTResponseSenderBlock) callback)
 
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(userContactsChange:) name:CNContactStoreDidChangeNotification object:nil];
     callback(@[[NSNull null], @"authorized"]);
+}
+
+RCT_EXPORT_METHOD(unsubscribeFromUpdates)
+{
+    NSLog(@"RCTContacts: [unsubscribeFromUpdates]");
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
 RCT_EXPORT_METHOD(checkPermission:(RCTResponseSenderBlock) callback)
