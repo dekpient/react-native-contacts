@@ -10,6 +10,7 @@ declare module 'react-native-contacts' {
   export function checkPermission(callback: (error: any, result: 'authorized' | 'denied' | 'undefined') => void): void;
   export function requestPermission(callback: (error: any, result: 'authorized' | 'denied' | 'undefined') => void): void;
   export function subscribeToUpdates(callback: (error: any, result: 'authorized' | 'denied' | 'undefined') => void): void;
+  export function unsubscribeFromUpdates(): void;
 
   export interface EmailAddress {
       label: string;

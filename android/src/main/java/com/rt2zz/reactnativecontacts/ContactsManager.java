@@ -100,6 +100,23 @@ public class ContactsManager extends ReactContextBaseJavaModule {
         }
     }
 
+    /**
+     * Unregisters the content observer
+     *
+     */
+    @ReactMethod
+    public void unsubscribeFromUpdates() {
+        Log.d(LOG_TAG, "[unsubscribeFromUpdates] Unsubscribing from contact updates");
+        try {
+            getReactApplicationContext()
+                    .getApplicationContext()
+                    .getContentResolver()
+                    .unregisterContentObserver(contactsObserver);
+        } catch (Exception e) {
+            Log.e(LOG_TAG, "[unsubscribeFromUpdates] Error when unsubscribing from contact updates", e);
+        }
+    }
+
     /*
      * Returns all contactable records on phone
      * queries CommonDataKinds.Contactables to get phones and emails
@@ -415,7 +432,7 @@ public class ContactsManager extends ReactContextBaseJavaModule {
                 .withValue(StructuredName.PREFIX, prefix)
                 .withValue(StructuredName.SUFFIX, suffix);
         ops.add(op.build());
-        
+
         op = ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
                 .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
                 .withValue(ContactsContract.Data.MIMETYPE, Note.CONTENT_ITEM_TYPE)
@@ -470,7 +487,7 @@ public class ContactsManager extends ReactContextBaseJavaModule {
                         .build());
             }
         }
-    
+
         ReadableArray postalAddresses = contact.hasKey("postalAddresses") ? contact.getArray("postalAddresses") : null;
         if (postalAddresses != null) {
             for (int i = 0; i < postalAddresses.size(); i++) {
@@ -489,7 +506,7 @@ public class ContactsManager extends ReactContextBaseJavaModule {
                 ops.add(op.build());
             }
         }
-      
+
         Context ctx = getReactApplicationContext();
         try {
             ContentResolver cr = ctx.getContentResolver();
@@ -502,8 +519,8 @@ public class ContactsManager extends ReactContextBaseJavaModule {
                 ContactsProvider contactsProvider = new ContactsProvider(cr);
                 WritableMap newlyAddedContact = contactsProvider.getContactByRawId(rawId);
 
-                callback.invoke(null, newlyAddedContact); // success           
-            }      
+                callback.invoke(null, newlyAddedContact); // success
+            }
         } catch (Exception e) {
             callback.invoke(e.toString());
         }
@@ -512,8 +529,8 @@ public class ContactsManager extends ReactContextBaseJavaModule {
     public byte[] toByteArray(Bitmap bitmap) {
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
         bitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream);
-        return stream.toByteArray();       
-    }    
+        return stream.toByteArray();
+    }
 
     /*
      * Update contact to phone's addressbook
@@ -667,7 +684,7 @@ public class ContactsManager extends ReactContextBaseJavaModule {
 
          if(thumbnailPath != null && !thumbnailPath.isEmpty()) {
             Bitmap photo = BitmapFactory.decodeFile(thumbnailPath);
-     
+
             if(photo != null) {
                 ops.add(ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
                         .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
@@ -704,8 +721,8 @@ public class ContactsManager extends ReactContextBaseJavaModule {
                 ContactsProvider contactsProvider = new ContactsProvider(cr);
                 WritableMap updatedContact = contactsProvider.getContactById(recordID);
 
-                callback.invoke(null, updatedContact); // success           
-            }      
+                callback.invoke(null, updatedContact); // success
+            }
         } catch (Exception e) {
             callback.invoke(e.toString());
         }
@@ -718,7 +735,7 @@ public class ContactsManager extends ReactContextBaseJavaModule {
     public void deleteContact(ReadableMap contact, Callback callback) {
 
         String recordID = contact.hasKey("recordID") ? contact.getString("recordID") : null;
-      
+
         try {
                Context ctx = getReactApplicationContext();
 
