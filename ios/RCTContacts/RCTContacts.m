@@ -108,8 +108,13 @@ RCT_EXPORT_METHOD(getContactsMatchingString:(NSString *)string callback:(RCTResp
                                                            keysToFetch:keys
                                                                  error:&contactError];
     [arrayOfContacts enumerateObjectsUsingBlock:^(CNContact * _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+        if (!obj) {
+            return;
+        }
         NSDictionary *contactDictionary = [self contactToDictionary:obj withThumbnails:NO];
-        [contacts addObject:contactDictionary];
+        if (contactDictionary) {
+            [contacts addObject:contactDictionary];
+        }
     }];
     callback(@[[NSNull null], contacts]);
 }
@@ -166,10 +171,14 @@ RCT_EXPORT_METHOD(getAllWithoutPhotos:(RCTResponseSenderBlock) callback)
 
     CNContactFetchRequest * request = [[CNContactFetchRequest alloc]initWithKeysToFetch:keysToFetch];
     BOOL success = [contactStore enumerateContactsWithFetchRequest:request error:&contactError usingBlock:^(CNContact * __nonnull contact, BOOL * __nonnull stop){
+        if (!contact) {
+            return;
+        }
         NSDictionary *contactDict = [self contactToDictionary: contact withThumbnails:withThumbnails];
-        [contacts addObject:contactDict];
+        if (contactDict) {
+            [contacts addObject:contactDict];
+        }
     }];
-
     callback(@[[NSNull null], contacts]);
 }
 
@@ -186,7 +195,11 @@ RCT_EXPORT_METHOD(getAllWithoutPhotos:(RCTResponseSenderBlock) callback)
     NSString *jobTitle = person.jobTitle;
     NSString *note = person.note;
     NSDateComponents *birthday = person.birthday;
-    
+
+    if (!recordID) {
+        return nil;
+    }
+
     [output setObject:recordID forKey: @"recordID"];
 
     if (givenName) {
