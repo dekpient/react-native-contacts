@@ -139,35 +139,75 @@ RCT_EXPORT_METHOD(getAllWithoutPhotos:(RCTResponseSenderBlock) callback)
     [self getAllContacts:callback withThumbnails:false];
 }
 
+RCT_EXPORT_METHOD(getAllWithFields:(NSArray *)fields callback:(RCTResponseSenderBlock) callback)
+{
+    NSArray *keysToFetch = [self getKeysToFetchFrom:fields withThumbnails:false];
+    CNContactStore* contactStore = [self contactsStore:callback];
+    if (!contactStore)
+        return;
+
+    [self retrieveContactsFromAddressBook:contactStore withThumbnails:false withKeysToFetch:keysToFetch withCallback:callback];
+}
+
+- (nonnull NSArray <id<CNKeyDescriptor>> *)getKeysToFetchFrom:(NSArray<NSString *> *)fields withThumbnails:(BOOL) withThumbnails
+{
+    NSDictionary *const keysMapping = @{
+                                        @"recordId": CNContactIdentifierKey,
+                                        @"emailAddresses": CNContactEmailAddressesKey,
+                                        @"phoneNumbers": CNContactPhoneNumbersKey,
+                                        @"familyName": CNContactFamilyNameKey,
+                                        @"givenName": CNContactGivenNameKey,
+                                        @"middleName": CNContactMiddleNameKey,
+                                        @"postalAddresses": CNContactPostalAddressesKey,
+                                        @"company": CNContactOrganizationNameKey,
+                                        @"imageAvailable": CNContactImageDataAvailableKey,
+                                        @"note": CNContactNoteKey,
+                                        @"urlAddresses": CNContactUrlAddressesKey,
+                                        @"birthday": CNContactBirthdayKey,
+                                        @"jobTitle": CNContactJobTitleKey
+                                        };
+
+    NSMutableArray <id<CNKeyDescriptor>> *keysToFetch = [NSMutableArray arrayWithCapacity:fields.count];
+
+    if (fields == nil) {
+        // If no fields are defined, get all fields.
+        [keysToFetch addObjectsFromArray:[keysMapping allValues]];
+    } else {
+        // Add default fields and user defined fields.
+        [keysToFetch addObject:CNContactIdentifierKey];
+
+        for (NSString *field in fields) {
+            if (keysMapping[field]) {
+                [keysToFetch addObject:keysMapping[field]];
+            }
+        }
+    }
+
+    if (withThumbnails) {
+        [keysToFetch addObjectsFromArray:@[CNContactImageDataAvailableKey, CNContactThumbnailImageDataKey]];
+    }
+
+    // Remove duplicates
+    return [[NSSet setWithArray:keysToFetch] allObjects];
+}
+
 -(void) retrieveContactsFromAddressBook:(CNContactStore*)contactStore
                          withThumbnails:(BOOL) withThumbnails
+                           withCallback:(RCTResponseSenderBlock) callback
+{
+    NSArray *keysToFetch = [self getKeysToFetchFrom:nil withThumbnails:withThumbnails];
+    [self retrieveContactsFromAddressBook:contactStore withThumbnails:withThumbnails withKeysToFetch:keysToFetch withCallback:callback];
+}
+
+-(void) retrieveContactsFromAddressBook:(CNContactStore*)contactStore
+                         withThumbnails:(BOOL) withThumbnails
+                        withKeysToFetch:(NSArray *) keysToFetch
                            withCallback:(RCTResponseSenderBlock) callback
 {
     NSMutableArray *contacts = [[NSMutableArray alloc] init];
 
     NSError* contactError;
     [contactStore containersMatchingPredicate:[CNContainer predicateForContainersWithIdentifiers: @[contactStore.defaultContainerIdentifier]] error:&contactError];
-
-
-    NSMutableArray *keysToFetch = [[NSMutableArray alloc]init];
-    [keysToFetch addObjectsFromArray:@[
-                                       CNContactEmailAddressesKey,
-                                       CNContactPhoneNumbersKey,
-                                       CNContactFamilyNameKey,
-                                       CNContactGivenNameKey,
-                                       CNContactMiddleNameKey,
-                                       CNContactPostalAddressesKey,
-                                       CNContactOrganizationNameKey,
-                                       CNContactJobTitleKey,
-                                       CNContactImageDataAvailableKey,
-                                       CNContactNoteKey,
-                                       CNContactUrlAddressesKey,
-                                       CNContactBirthdayKey
-                                       ]];
-
-    if(withThumbnails) {
-        [keysToFetch addObject:CNContactThumbnailImageDataKey];
-    }
 
     CNContactFetchRequest * request = [[CNContactFetchRequest alloc]initWithKeysToFetch:keysToFetch];
     BOOL success = [contactStore enumerateContactsWithFetchRequest:request error:&contactError usingBlock:^(CNContact * __nonnull contact, BOOL * __nonnull stop){
@@ -188,45 +228,44 @@ RCT_EXPORT_METHOD(getAllWithoutPhotos:(RCTResponseSenderBlock) callback)
     NSMutableDictionary* output = [NSMutableDictionary dictionary];
 
     NSString *recordID = person.identifier;
-    NSString *givenName = person.givenName;
-    NSString *familyName = person.familyName;
-    NSString *middleName = person.middleName;
-    NSString *company = person.organizationName;
-    NSString *jobTitle = person.jobTitle;
-    NSString *note = person.note;
-    NSDateComponents *birthday = person.birthday;
-
     if (!recordID) {
         return nil;
     }
 
     [output setObject:recordID forKey: @"recordID"];
 
-    if (givenName) {
+    if ([person isKeyAvailable:CNContactGivenNameKey]) {
+        NSString *givenName = person.givenName;
         [output setObject: (givenName) ? givenName : @"" forKey:@"givenName"];
     }
 
-    if (familyName) {
+    if ([person isKeyAvailable:CNContactFamilyNameKey]) {
+        NSString *familyName = person.familyName;
         [output setObject: (familyName) ? familyName : @"" forKey:@"familyName"];
     }
 
-    if(middleName){
+    if ([person isKeyAvailable:CNContactMiddleNameKey]) {
+        NSString *middleName = person.middleName;
         [output setObject: (middleName) ? middleName : @"" forKey:@"middleName"];
     }
 
-    if(company){
+    if ([person isKeyAvailable:CNContactOrganizationNameKey]) {
+        NSString *company = person.organizationName;
         [output setObject: (company) ? company : @"" forKey:@"company"];
     }
 
-    if(jobTitle){
+    if ([person isKeyAvailable:CNContactJobTitleKey]) {
+        NSString *jobTitle = person.jobTitle;
         [output setObject: (jobTitle) ? jobTitle : @"" forKey:@"jobTitle"];
     }
 
-    if(note){
+    if ([person isKeyAvailable:CNContactNoteKey]) {
+        NSString *note = person.note;
         [output setObject: (note) ? note : @"" forKey:@"note"];
     }
 
-    if (birthday) {
+    if ([person isKeyAvailable:CNContactBirthdayKey]) {
+        NSDateComponents *birthday = person.birthday;
         if (birthday.month != NSDateComponentUndefined && birthday.day != NSDateComponentUndefined) {
             //months are indexed to 0 in JavaScript (0 = January) so we subtract 1 from NSDateComponents.month
             if (birthday.year != NSDateComponentUndefined) {
@@ -237,120 +276,121 @@ RCT_EXPORT_METHOD(getAllWithoutPhotos:(RCTResponseSenderBlock) callback)
         }
     }
 
-    //handle phone numbers
-    NSMutableArray *phoneNumbers = [[NSMutableArray alloc] init];
+    if ([person isKeyAvailable:CNContactPhoneNumbersKey]) {
+        NSMutableArray *phoneNumbers = [[NSMutableArray alloc] init];
 
-    for (CNLabeledValue<CNPhoneNumber*>* labeledValue in person.phoneNumbers) {
-        NSMutableDictionary* phone = [NSMutableDictionary dictionary];
-        NSString * label = [CNLabeledValue localizedStringForLabel:[labeledValue label]];
-        NSString* value = [[labeledValue value] stringValue];
+        for (CNLabeledValue<CNPhoneNumber*>* labeledValue in person.phoneNumbers) {
+            NSMutableDictionary* phone = [NSMutableDictionary dictionary];
+            NSString * label = [CNLabeledValue localizedStringForLabel:[labeledValue label]];
+            NSString* value = [[labeledValue value] stringValue];
 
-        if(value) {
-            if(!label) {
-                label = [CNLabeledValue localizedStringForLabel:@"other"];
+            if(value) {
+                if(!label) {
+                    label = [CNLabeledValue localizedStringForLabel:@"other"];
+                }
+                [phone setObject: value forKey:@"number"];
+                [phone setObject: label forKey:@"label"];
+                [phoneNumbers addObject:phone];
             }
-            [phone setObject: value forKey:@"number"];
-            [phone setObject: label forKey:@"label"];
-            [phoneNumbers addObject:phone];
         }
+
+        [output setObject:phoneNumbers forKey:@"phoneNumbers"];
     }
 
-    [output setObject: phoneNumbers forKey:@"phoneNumbers"];
-    //end phone numbers
+    if ([person isKeyAvailable:CNContactUrlAddressesKey]) {
+        NSMutableArray *urlAddresses = [[NSMutableArray alloc] init];
 
-    //handle urls
-    NSMutableArray *urlAddresses = [[NSMutableArray alloc] init];
+        for (CNLabeledValue<NSString*>* labeledValue in person.urlAddresses) {
+            NSMutableDictionary* url = [NSMutableDictionary dictionary];
+            NSString* label = [CNLabeledValue localizedStringForLabel:[labeledValue label]];
+            NSString* value = [labeledValue value];
 
-    for (CNLabeledValue<NSString*>* labeledValue in person.urlAddresses) {
-        NSMutableDictionary* url = [NSMutableDictionary dictionary];
-        NSString* label = [CNLabeledValue localizedStringForLabel:[labeledValue label]];
-        NSString* value = [labeledValue value];
-
-        if(value) {
-            if(!label) {
-                label = [CNLabeledValue localizedStringForLabel:@"home"];
+            if(value) {
+                if(!label) {
+                    label = [CNLabeledValue localizedStringForLabel:@"home"];
+                }
+                [url setObject: value forKey:@"url"];
+                [url setObject: label forKey:@"label"];
+                [urlAddresses addObject:url];
+            } else {
+                NSLog(@"ignoring blank url");
             }
-            [url setObject: value forKey:@"url"];
-            [url setObject: label forKey:@"label"];
-            [urlAddresses addObject:url];
-        } else {
-            NSLog(@"ignoring blank url");
         }
+
+        [output setObject:urlAddresses forKey:@"urlAddresses"];
     }
 
-    [output setObject: urlAddresses forKey:@"urlAddresses"];
+    if ([person isKeyAvailable:CNContactEmailAddressesKey]) {
+        NSMutableArray *emailAddreses = [[NSMutableArray alloc] init];
 
-    //end urls
+        for (CNLabeledValue<NSString*>* labeledValue in person.emailAddresses) {
+            NSMutableDictionary* email = [NSMutableDictionary dictionary];
+            NSString* label = [CNLabeledValue localizedStringForLabel:[labeledValue label]];
+            NSString* value = [labeledValue value];
 
-    //handle emails
-    NSMutableArray *emailAddreses = [[NSMutableArray alloc] init];
-
-    for (CNLabeledValue<NSString*>* labeledValue in person.emailAddresses) {
-        NSMutableDictionary* email = [NSMutableDictionary dictionary];
-        NSString* label = [CNLabeledValue localizedStringForLabel:[labeledValue label]];
-        NSString* value = [labeledValue value];
-
-        if(value) {
-            if(!label) {
-                label = [CNLabeledValue localizedStringForLabel:@"other"];
+            if(value) {
+                if(!label) {
+                    label = [CNLabeledValue localizedStringForLabel:@"other"];
+                }
+                [email setObject: value forKey:@"email"];
+                [email setObject: label forKey:@"label"];
+                [emailAddreses addObject:email];
+            } else {
+                NSLog(@"ignoring blank email");
             }
-            [email setObject: value forKey:@"email"];
-            [email setObject: label forKey:@"label"];
-            [emailAddreses addObject:email];
-        } else {
-            NSLog(@"ignoring blank email");
         }
+
+        [output setObject:emailAddreses forKey:@"emailAddresses"];
     }
 
-    [output setObject: emailAddreses forKey:@"emailAddresses"];
-    //end emails
+    if ([person isKeyAvailable:CNContactPostalAddressesKey]) {
+        NSMutableArray *postalAddresses = [[NSMutableArray alloc] init];
 
-    //handle postal addresses
-    NSMutableArray *postalAddresses = [[NSMutableArray alloc] init];
+        for (CNLabeledValue<CNPostalAddress*>* labeledValue in person.postalAddresses) {
+            CNPostalAddress* postalAddress = labeledValue.value;
+            NSMutableDictionary* address = [NSMutableDictionary dictionary];
 
-    for (CNLabeledValue<CNPostalAddress*>* labeledValue in person.postalAddresses) {
-        CNPostalAddress* postalAddress = labeledValue.value;
-        NSMutableDictionary* address = [NSMutableDictionary dictionary];
+            NSString* street = postalAddress.street;
+            if(street){
+                [address setObject:street forKey:@"street"];
+            }
+            NSString* city = postalAddress.city;
+            if(city){
+                [address setObject:city forKey:@"city"];
+            }
+            NSString* state = postalAddress.state;
+            if(state){
+                [address setObject:state forKey:@"state"];
+            }
+            NSString* region = postalAddress.state;
+            if(region){
+                [address setObject:region forKey:@"region"];
+            }
+            NSString* postCode = postalAddress.postalCode;
+            if(postCode){
+                [address setObject:postCode forKey:@"postCode"];
+            }
+            NSString* country = postalAddress.country;
+            if(country){
+                [address setObject:country forKey:@"country"];
+            }
 
-        NSString* street = postalAddress.street;
-        if(street){
-            [address setObject:street forKey:@"street"];
-        }
-        NSString* city = postalAddress.city;
-        if(city){
-            [address setObject:city forKey:@"city"];
-        }
-        NSString* state = postalAddress.state;
-        if(state){
-            [address setObject:state forKey:@"state"];
-        }
-        NSString* region = postalAddress.state;
-        if(region){
-            [address setObject:region forKey:@"region"];
-        }
-        NSString* postCode = postalAddress.postalCode;
-        if(postCode){
-            [address setObject:postCode forKey:@"postCode"];
-        }
-        NSString* country = postalAddress.country;
-        if(country){
-            [address setObject:country forKey:@"country"];
+            NSString* label = [CNLabeledValue localizedStringForLabel:labeledValue.label];
+            if(label) {
+                [address setObject:label forKey:@"label"];
+
+                [postalAddresses addObject:address];
+            }
         }
 
-        NSString* label = [CNLabeledValue localizedStringForLabel:labeledValue.label];
-        if(label) {
-            [address setObject:label forKey:@"label"];
-
-            [postalAddresses addObject:address];
-        }
+        [output setObject:postalAddresses forKey:@"postalAddresses"];
     }
 
-    [output setObject:postalAddresses forKey:@"postalAddresses"];
-    //end postal addresses
-
-    [output setValue:[NSNumber numberWithBool:person.imageDataAvailable] forKey:@"hasThumbnail"];
-    if (withThumbnails) {
-        [output setObject:[self getFilePathForThumbnailImage:person recordID:recordID] forKey:@"thumbnailPath"];
+    if ([person isKeyAvailable:CNContactImageDataAvailableKey]) {
+        [output setValue:[NSNumber numberWithBool:person.imageDataAvailable] forKey:@"hasThumbnail"];
+        if (withThumbnails) {
+            [output setObject:[self getFilePathForThumbnailImage:person recordID:recordID] forKey:@"thumbnailPath"];
+        }
     }
 
     return output;
@@ -371,7 +411,7 @@ RCT_EXPORT_METHOD(getAllWithoutPhotos:(RCTResponseSenderBlock) callback)
         return filepath;
     }
 
-    if (contact.imageDataAvailable){
+    if (contact.imageDataAvailable && [contact isKeyAvailable:CNContactThumbnailImageDataKey]){
         NSData *contactImageData = contact.thumbnailImageData;
 
         BOOL success = [[NSFileManager defaultManager] createFileAtPath:filepath contents:contactImageData attributes:nil];
